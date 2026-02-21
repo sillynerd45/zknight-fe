@@ -21,7 +21,7 @@ importScripts('https://cdn.jsdelivr.net/npm/snarkjs@0.7.6/build/snarkjs.min.js')
 
 // Paths to WASM and zkey files
 const WASM_PATH = '/zk/zknight.wasm';
-const ZKEY_PATH = 'https://github.com/sillynerd45/zknight/releases/download/zk-assets-v1/zknight_final.zkey';
+const ZKEY_PATH = 'https://zknight.wazowsky.id/zknight_final.zkey';
 
 /**
  * Build the full circuit input matching the ZKnight circom template.
@@ -42,111 +42,111 @@ const ZKEY_PATH = 'https://github.com/sillynerd45/zknight/releases/download/zk-a
  *   signal input moves[512];               // 0=Up, 1=Down, 2=Left, 3=Right, 4=NoOp (PRIVATE)
  */
 function buildCircuitInput(moves, puzzle, tick_count) {
-  // Out-of-bounds sentinel matches circuit convention: [grid_width, grid_height]
-  const grid_width = puzzle.grid_width || 11;
-  const grid_height = puzzle.grid_height || 7;
-  const OOB = [String(grid_width), String(grid_height)];
+    // Out-of-bounds sentinel matches circuit convention: [grid_width, grid_height]
+    const grid_width = puzzle.grid_width || 11;
+    const grid_height = puzzle.grid_height || 7;
+    const OOB = [String(grid_width), String(grid_height)];
 
-  // Pad walls to exactly 16 entries
-  const walls = [];
-  for (const w of (puzzle.walls || [])) {
-    walls.push([String(w.x), String(w.y)]);
-  }
-  while (walls.length < 26) {
-    walls.push(OOB.slice());
-  }
-
-  // Pad static_tnt to exactly 8 entries
-  const static_tnt = [];
-  for (const t of (puzzle.static_tnt || [])) {
-    static_tnt.push([String(t.x), String(t.y)]);
-  }
-  while (static_tnt.length < 8) {
-    static_tnt.push(OOB.slice());
-  }
-
-  // Pad barrel_paths: exactly 2 barrels, each with 16 path steps
-  const barrels = puzzle.moving_barrels || [];
-  const barrel_paths = [];
-  const barrel_path_lengths = [];
-
-  for (let b = 0; b < 2; b++) {
-    const path = [];
-    if (b < barrels.length && barrels[b].path) {
-      const realPath = barrels[b].path;
-      barrel_path_lengths.push(String(realPath.length));
-      for (const pos of realPath) {
-        path.push([String(pos.x), String(pos.y)]);
-      }
-    } else {
-      barrel_path_lengths.push("1"); // dummy barrel with length 1
+    // Pad walls to exactly 16 entries
+    const walls = [];
+    for (const w of (puzzle.walls || [])) {
+        walls.push([String(w.x), String(w.y)]);
     }
-    // Pad path to exactly 16 steps
-    while (path.length < 16) {
-      path.push(OOB.slice());
+    while (walls.length < 26) {
+        walls.push(OOB.slice());
     }
-    barrel_paths.push(path);
-  }
 
-  // Convert moves to strings
-  const movesStr = moves.map(m => String(m));
+    // Pad static_tnt to exactly 8 entries
+    const static_tnt = [];
+    for (const t of (puzzle.static_tnt || [])) {
+        static_tnt.push([String(t.x), String(t.y)]);
+    }
+    while (static_tnt.length < 8) {
+        static_tnt.push(OOB.slice());
+    }
 
-  const input = {
-    grid_width: String(grid_width),
-    grid_height: String(grid_height),
-    knight_a_start: [String(puzzle.knight_a_start.x), String(puzzle.knight_a_start.y)],
-    knight_b_start: [String(puzzle.knight_b_start.x), String(puzzle.knight_b_start.y)],
-    goal_a: [String(puzzle.goal_a.x), String(puzzle.goal_a.y)],
-    goal_b: [String(puzzle.goal_b.x), String(puzzle.goal_b.y)],
-    walls,
-    static_tnt,
-    barrel_paths,
-    barrel_path_lengths,
-    tick_count: String(tick_count),
-    puzzle_id: String(puzzle.id),
-    moves: movesStr,
-  };
+    // Pad barrel_paths: exactly 2 barrels, each with 16 path steps
+    const barrels = puzzle.moving_barrels || [];
+    const barrel_paths = [];
+    const barrel_path_lengths = [];
 
-  return input;
+    for (let b = 0; b < 2; b++) {
+        const path = [];
+        if (b < barrels.length && barrels[b].path) {
+            const realPath = barrels[b].path;
+            barrel_path_lengths.push(String(realPath.length));
+            for (const pos of realPath) {
+                path.push([String(pos.x), String(pos.y)]);
+            }
+        } else {
+            barrel_path_lengths.push("1"); // dummy barrel with length 1
+        }
+        // Pad path to exactly 16 steps
+        while (path.length < 16) {
+            path.push(OOB.slice());
+        }
+        barrel_paths.push(path);
+    }
+
+    // Convert moves to strings
+    const movesStr = moves.map(m => String(m));
+
+    const input = {
+        grid_width: String(grid_width),
+        grid_height: String(grid_height),
+        knight_a_start: [String(puzzle.knight_a_start.x), String(puzzle.knight_a_start.y)],
+        knight_b_start: [String(puzzle.knight_b_start.x), String(puzzle.knight_b_start.y)],
+        goal_a: [String(puzzle.goal_a.x), String(puzzle.goal_a.y)],
+        goal_b: [String(puzzle.goal_b.x), String(puzzle.goal_b.y)],
+        walls,
+        static_tnt,
+        barrel_paths,
+        barrel_path_lengths,
+        tick_count: String(tick_count),
+        puzzle_id: String(puzzle.id),
+        moves: movesStr,
+    };
+
+    return input;
 }
 
 /**
  * Main message handler
  */
 self.onmessage = async function (e) {
-  const { moves, puzzle, tick_count } = e.data;
+    const {moves, puzzle, tick_count} = e.data;
 
-  try {
-    console.log('[ProveWorker] Starting proof generation...');
-    console.log('[ProveWorker] Tick count:', tick_count);
-    console.log('[ProveWorker] Puzzle ID:', puzzle.id);
-    console.log('[ProveWorker] Grid:', puzzle.grid_width, 'x', puzzle.grid_height);
-    console.log('[ProveWorker] Walls:', (puzzle.walls || []).length, '/ 16 slots');
-    console.log('[ProveWorker] Static TNT:', (puzzle.static_tnt || []).length, '/ 8 slots');
-    console.log('[ProveWorker] Barrels:', (puzzle.moving_barrels || []).length, '/ 2 slots');
+    try {
+        console.log('[ProveWorker] Starting proof generation...');
+        console.log('[ProveWorker] Tick count:', tick_count);
+        console.log('[ProveWorker] Puzzle ID:', puzzle.id);
+        console.log('[ProveWorker] Grid:', puzzle.grid_width, 'x', puzzle.grid_height);
+        console.log('[ProveWorker] Walls:', (puzzle.walls || []).length, '/ 16 slots');
+        console.log('[ProveWorker] Static TNT:', (puzzle.static_tnt || []).length, '/ 8 slots');
+        console.log('[ProveWorker] Barrels:', (puzzle.moving_barrels || []).length, '/ 2 slots');
 
-    // Build full circuit input
-    const input = buildCircuitInput(moves, puzzle, tick_count);
+        // Build full circuit input
+        const input = buildCircuitInput(moves, puzzle, tick_count);
 
-    // Generate proof (this takes 5-15 seconds)
-    const startTime = Date.now();
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      input,
-      WASM_PATH,
-      ZKEY_PATH
-    );
-    const duration = Date.now() - startTime;
+        // Generate proof (this takes 5-15 seconds)
+        const startTime = Date.now();
+        const {proof, publicSignals} = await snarkjs.groth16.fullProve(
+            input,
+            WASM_PATH,
+            ZKEY_PATH
+        );
+        const duration = Date.now() - startTime;
 
-    console.log('[ProveWorker] Proof generated successfully in', duration, 'ms');
+        console.log('[ProveWorker] Proof generated successfully in', duration, 'ms');
 
-    // Send proof back to main thread
-    self.postMessage({ proof, publicSignals });
-  } catch (error) {
-    console.error('[ProveWorker] Proof generation failed:', error);
-    self.postMessage({
-      error: error.message || 'Unknown error during proof generation',
-    });
-  }
+        // Send proof back to main thread
+        self.postMessage({proof, publicSignals});
+    } catch (error) {
+        console.error('[ProveWorker] Proof generation failed:', error);
+        self.postMessage({
+            error: error.message || 'Unknown error during proof generation',
+        });
+    }
 };
 
 console.log('[ProveWorker] Worker initialized and ready');
