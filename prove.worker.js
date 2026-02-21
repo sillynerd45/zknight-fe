@@ -23,6 +23,30 @@ importScripts('https://cdn.jsdelivr.net/npm/snarkjs@0.7.6/build/snarkjs.min.js')
 const WASM_PATH = '/zk/zknight.wasm';
 const ZKEY_PATH = 'https://zknight-assets.wazowsky.id/zknight_final.zkey';
 
+// Cache API key — bump the version suffix if the zkey is ever regenerated
+const ZKEY_CACHE_NAME = 'zknight-zkey-v1';
+
+/**
+ * Fetch the zkey file, using the Cache API for persistence across sessions.
+ * On first call: downloads from R2, stores in cache, returns Uint8Array.
+ * On subsequent calls: loads from cache without hitting the network.
+ * @returns {Promise<Uint8Array>}
+ */
+async function fetchZkeyBytes() {
+    const cache = await caches.open(ZKEY_CACHE_NAME);
+    const cached = await cache.match(ZKEY_PATH);
+    if (cached) {
+        console.log('[ProveWorker] zkey loaded from Cache API');
+        return new Uint8Array(await cached.arrayBuffer());
+    }
+    console.log('[ProveWorker] zkey not cached — downloading from R2...');
+    const res = await fetch(ZKEY_PATH);
+    if (!res.ok) throw new Error(`Failed to fetch zkey: ${res.status} ${res.statusText}`);
+    await cache.put(ZKEY_PATH, res.clone());
+    console.log('[ProveWorker] zkey downloaded and stored in Cache API');
+    return new Uint8Array(await res.arrayBuffer());
+}
+
 /**
  * Build the full circuit input matching the ZKnight circom template.
  *
@@ -128,12 +152,15 @@ self.onmessage = async function (e) {
         // Build full circuit input
         const input = buildCircuitInput(moves, puzzle, tick_count);
 
+        // Load zkey from Cache API (downloads on first use, instant on repeat)
+        const zkeyBytes = await fetchZkeyBytes();
+
         // Generate proof (this takes 5-15 seconds)
         const startTime = Date.now();
         const {proof, publicSignals} = await snarkjs.groth16.fullProve(
             input,
             WASM_PATH,
-            ZKEY_PATH
+            { type: 'mem', data: zkeyBytes }
         );
         const duration = Date.now() - startTime;
 
